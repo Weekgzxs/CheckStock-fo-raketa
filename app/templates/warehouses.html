@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Склады фулфилмента</h2>
+<p class="hint">Удаление мягкое: ФФ пропадает из новых операций, но его остатки, резервы и история сохраняются.
+  Остаток с удалённого ФФ можно переместить на другой ФФ, начатые операции можно завершить.</p>
+<table>
+  <tr><th>#</th><th>Название</th><th class="n">Физически</th><th class="n">Резерв FBS</th><th class="n">Едет на ФФ</th>
+    <th>Что числится</th><th></th></tr>
+  {% for w in warehouses %}
+  <tr>
+    <td>{{ w.id }}</td>
+    {% if w.deleted_at %}
+    <td>{{ w.name }} <span class="tag">удалён {{ w.deleted_at.strftime("%d.%m %H:%M") }}</span></td>
+    {% else %}
+    <td><form class="inline" method="post" action="/warehouses/{{ w.id }}/rename">
+      <input name="name" value="{{ w.name }}" required> <button>Переименовать</button></form></td>
+    {% endif %}
+    <td class="n">{{ w.on_hand }}</td><td class="n">{{ w.reserved }}</td><td class="n">{{ w.incoming }}</td>
+    <td>{{ w.items or "—" }}</td>
+    <td>{% if not w.deleted_at %}
+      {% set q = "Удалить ФФ «%s»?" % w.name %}
+      {% if w.on_hand or w.incoming %}{% set q = q ~ " На нём числится %s шт. (резерв %s), едет ещё %s. Остатки сохранятся на удалённом ФФ, их можно будет переместить." % (w.on_hand, w.reserved, w.incoming) %}{% endif %}
+      <form class="inline" method="post" action="/warehouses/{{ w.id }}/delete" onsubmit='return confirm({{ q | tojson }})'>
+        <button>Удалить</button></form>
+    {% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<form class="card" method="post" action="/warehouses" style="max-width:360px">
+  <h2>Новый ФФ</h2>
+  <label>Название <input name="name" required></label>
+  <button>Добавить</button>
+</form>
+{% endblock %}

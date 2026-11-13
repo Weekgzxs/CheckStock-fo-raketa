@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% macro wh(name, deleted) %}{{ name }}{% if deleted %} <span class="tag">удалён</span>{% endif %}{% endmacro %}
+{% block content %}
+
+<h2>Где сейчас товар</h2>
+<p class="hint">Сверка: приход = на ФФ + в пути между ФФ + FBO в пути + на складе МП + FBS к клиенту.</p>
+<table>
+  <tr><th>Артикул</th><th>Товар</th>
+    <th class="n">Физически на ФФ</th><th class="n">Доступно</th><th class="n">Резерв FBS</th>
+    <th class="n">В пути ФФ→ФФ</th><th class="n">FBO в пути</th><th class="n">На складе МП</th>
+    <th class="n">FBS к клиенту</th><th class="n">Приход всего</th><th>Сверка</th></tr>
+  {% for r in summary %}
+  <tr><td>{{ r.sku }}</td><td>{{ r.name }}</td>
+    <td class="n">{{ r.on_hand }}</td><td class="n"><b>{{ r.available }}</b></td><td class="n">{{ r.reserved }}</td>
+    <td class="n">{{ r.transit_ff }}</td><td class="n">{{ r.fbo_transit }}</td><td class="n">{{ r.fbo_accepted }}</td>
+    <td class="n">{{ r.fbs_shipped }}</td><td class="n">{{ r.received }}</td>
+    <td>{% if r.balanced %}<span class="good">✓ сходится</span>{% else %}<span class="bad">✗ расхождение</span>{% endif %}</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Остатки по ФФ</h2>
+<table>
+  <tr><th>Артикул</th><th>Товар</th><th>ФФ</th><th class="n">Физически</th><th class="n">Доступно</th><th class="n">Резерв FBS</th></tr>
+  {% for r in by_wh %}
+  <tr><td>{{ r.sku }}</td><td>{{ r.name }}</td><td>{{ wh(r.wh, r.deleted) }}</td>
+    <td class="n">{{ r.on_hand }}</td><td class="n"><b>{{ r.available }}</b></td><td class="n">{{ r.reserved }}</td></tr>
+  {% endfor %}
+</table>
+
+{% set transfers = open_docs | selectattr("kind", "equalto", "transfer") | list %}
+{% set fbo = open_docs | selectattr("kind", "equalto", "fbo") | list %}
+{% set fbs_res = open_docs | selectattr("status", "equalto", "reserved") | list %}
+{% set fbs_out = open_docs | selectattr("status", "equalto", "shipped") | list %}
+
+<h2>В пути между ФФ</h2>
+{% if transfers %}<table>
+  <tr><th>#</th><th>Артикул</th><th class="n">Кол-во</th><th>Откуда</th><th>Куда</th><th></th></tr>
+  {% for d in transfers %}
+  <tr><td>{{ d.id }}</td><td>{{ d.sku }}</td><td class="n">{{ d.qty }}</td>
+    <td>{{ wh(d.from_name, d.from_deleted) }}</td><td>{{ wh(d.to_name, d.to_deleted) }}</td>
+    <td><form class="inline" method="post" action="/docs/{{ d.id }}/accept"><button>Принять на ФФ</button></form></td></tr>
+  {% endfor %}
+</table>{% else %}<p class="muted">Нет</p>{% endif %}
+
+<h2>Резервы FBS (товар на ФФ, заблокирован)</h2>
+{% if fbs_res %}<table>
+  <tr><th>#</th><th>Артикул</th><th class="n">Кол-во</th><th>ФФ</th><th></th></tr>
+  {% for d in fbs_res %}
+  <tr><td>{{ d.id }}</td><td>{{ d.sku }}</td><td class="n">{{ d.qty }}</td><td>{{ wh(d.from_name, d.from_deleted) }}</td>
+    <td><form class="inline" method="post" action="/docs/{{ d.id }}/ship"><button>Отгрузить клиенту</button></form>
+        <form class="inline" method="post" action="/docs/{{ d.id }}/cancel"><button>Отменить</button></form></td></tr>
+  {% endfor %}
+</table>{% else %}<p class="muted">Нет</p>{% endif %}
+
+<h2>FBO: в пути на склад маркетплейса</h2>
+{% if fbo %}<table>
+  <tr><th>#</th><th>Артикул</th><th class="n">Кол-во</th><th>С ФФ</th><th></th></tr>
+  {% for d in fbo %}
+  <tr><td>{{ d.id }}</td><td>{{ d.sku }}</td><td class="n">{{ d.qty }}</td><td>{{ wh(d.from_name, d.from_deleted) }}</td>
+    <td><form class="inline" method="post" action="/docs/{{ d.id }}/accept"><button>Принято складом МП</button></form></td></tr>
+  {% endfor %}
+</table>{% else %}<p class="muted">Нет</p>{% endif %}
+
+<h2>FBS: отгружено, едет к клиенту</h2>
+{% if fbs_out %}<table>
+  <tr><th>#</th><th>Артикул</th><th class="n">Кол-во</th><th>С ФФ</th><th>Отгружено</th></tr>
+  {% for d in fbs_out %}
+  <tr><td>{{ d.id }}</td><td>{{ d.sku }}</td><td class="n">{{ d.qty }}</td><td>{{ wh(d.from_name, d.from_deleted) }}</td>
+    <td>{{ d.updated_at.strftime("%d.%m %H:%M") }}</td></tr>
+  {% endfor %}
+</table>{% else %}<p class="muted">Нет</p>{% endif %}
+
+<form method="post" action="/reset" onsubmit="return confirm('Удалить все данные и загрузить тестовые?')" style="margin-top:24px">
+  <button>Сбросить к тестовым данным</button>
+</form>
+{% endblock %}

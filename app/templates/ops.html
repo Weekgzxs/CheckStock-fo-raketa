@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% set active = warehouses | rejectattr("deleted_at") | list %}
+{% macro sku_select(selected=None) %}
+<label>Товар <select name="sku" required>
+  {% for p in products %}<option value="{{ p.sku }}" {{ "selected" if p.sku == selected }}>{{ p.sku }} — {{ p.name }}</option>{% endfor %}
+</select></label>
+{% endmacro %}
+{% macro wh_select(name, list, label, selected=None) %}
+<label>{{ label }} <select name="{{ name }}" required>
+  {% for w in list %}<option value="{{ w.id }}" {{ "selected" if w.id == selected }}>{{ w.name }}{{ " (удалён)" if w.deleted_at }}</option>{% endfor %}
+</select></label>
+{% endmacro %}
+{% block content %}
+
+{% if shortage and shortage.enough_total %}
+{% set need = shortage.need - shortage.available %}
+<div class="card" style="border-color:#e0a000;margin-bottom:12px">
+  <b>Как выйти из нехватки:</b>
+  <p>
+  {% if shortage.available > 0 %}
+  <form class="inline" method="post" action="/ops/{{ form.kind }}">
+    <input type="hidden" name="wh" value="{{ form.wh }}"><input type="hidden" name="sku" value="{{ form.sku }}">
+    <input type="hidden" name="qty" value="{{ form.qty }}"><input type="hidden" name="request_id" value="{{ form.request_id }}">
+    <input type="hidden" name="split" value="true">
+    <button>Разбить: {{ shortage.available }} шт. с ФФ «{{ shortage.wh.name }}», остальное с других ФФ</button>
+  </form>
+  {% endif %}
+  {% for o in shortage.others if o.available >= form.qty %}
+  <form class="inline" method="post" action="/ops/{{ form.kind }}">
+    <input type="hidden" name="wh" value="{{ o.id }}"><input type="hidden" name="sku" value="{{ form.sku }}">
+    <input type="hidden" name="qty" value="{{ form.qty }}"><input type="hidden" name="request_id" value="{{ form.request_id }}">
+    <button>Всё с ФФ «{{ o.name }}»</button>
+  </form>
+  {% endfor %}
+  </p>
+  {% for o in shortage.others %}
+  <form method="post" action="/ops/transfer" style="margin-top:6px">
+    <input type="hidden" name="from_wh" value="{{ o.id }}"><input type="hidden" name="to_wh" value="{{ form.wh }}">
+    <input type="hidden" name="sku" value="{{ form.sku }}"><input type="hidden" name="request_id" value="{{ new_id() }}">
+    <input type="hidden" name="qty" value="{{ [o.available, need] | min }}">
+    <button>Переместить {{ [o.available, need] | min }} шт. с ФФ «{{ o.name }}» на ФФ «{{ shortage.wh.name }}»</button>
+    <span class="muted">— потом примите перемещение и повторите операцию</span>
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid">
+  <form class="card" method="post" action="/ops/receipt">
+    <h2>Приход на ФФ</h2>
+    <input type="hidden" name="request_id" value="{{ new_id() }}">
+    {{ wh_select("wh", active, "ФФ") }}
+    {{ sku_select() }}
+    <label>Количество <input type="number" name="qty" min="1" required></label>
+    <button>Оформить приход</button>
+  </form>
+
+  <form class="card" method="post" action="/ops/transfer">
+    <h2>Перемещение между ФФ</h2>
+    <p class="hint">Товар списывается с ФФ отправки и числится в пути до приёмки.</p>
+    <input type="hidden" name="request_id" value="{{ new_id() }}">
+    {{ wh_select("from_wh", warehouses, "Откуда") }}
+    {{ wh_select("to_wh", active, "Куда", (active[1].id if active | length > 1)) }}
+    {{ sku_select() }}
+    <label>Количество <input type="number" name="qty" min="1" required></label>
+    <button>Отправить</button>
+  </form>
+
+  {% for kind, title, hint, button in [
+      ("fbs", "Заказ FBS (резерв)", "Товар блокируется на ФФ до отгрузки клиенту или отмены.", "Зарезервировать"),
+      ("fbo", "Отгрузка FBO", "Товар покидает ФФ и числится в пути до приёмки складом маркетплейса.", "Отгрузить")] %}
+  {% set f = form if form and form.kind == kind else {} %}
+  <form class="card" method="post" action="/ops/{{ kind }}">
+    <h2>{{ title }}</h2>
+    <p class="hint">{{ hint }}</p>
+    <input type="hidden" name="request_id" value="{{ new_id() }}">
+    {{ wh_select("wh", active, "С ФФ", f.wh) }}
+    {{ sku_select(f.sku) }}
+    <label>Количество <input type="number" name="qty" min="1" value="{{ f.qty }}" required></label>
+    <button>{{ button }}</button>
+  </form>
+  {% endfor %}
+</div>
+{% endblock %}

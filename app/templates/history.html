@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>История операций</h2>
+<p class="hint">Названия ФФ записаны такими, какими были в момент операции.</p>
+<table>
+  <tr><th>Время</th><th>Док.</th><th>Операция</th><th>Артикул</th><th class="n">Кол-во</th><th>Откуда</th><th>Куда</th></tr>
+  {% for r in rows %}
+  <tr><td>{{ r.at.strftime("%d.%m %H:%M:%S") }}</td><td>{{ "#%s" % r.doc_id if r.doc_id else "" }}</td>
+    <td>{{ r.action }}</td><td>{{ r.sku or "" }}</td><td class="n">{{ r.qty or "" }}</td>
+    <td>{{ r.src or "" }}</td><td>{{ r.dst or "" }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}
