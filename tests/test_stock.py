@@ -195,6 +195,7 @@ def test_web_pages_and_shortage_flow(conn):
     with TestClient(app) as client:
         for url in ["/", "/ops", "/warehouses", "/history"]:
             assert client.get(url).status_code == 200, url
+        assert "SKU-101: 10" in client.get("/warehouses").text  # w.items in Jinja is dict.items, not the column
         r = client.post("/ops/fbs", data={"wh": SOUTH, "sku": "SKU-101", "qty": 8, "request_id": str(uuid4())})
         assert r.status_code == 409 and "Разбить" in r.text and "Всё с ФФ «Север»" in r.text
         r = client.post("/ops/fbs", data={"wh": NORTH, "sku": "SKU-101", "qty": 1, "request_id": str(uuid4())})

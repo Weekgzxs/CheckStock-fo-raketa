@@ -16,7 +16,7 @@
       <input name="name" value="{{ w.name }}" required> <button>Переименовать</button></form></td>
     {% endif %}
     <td class="n">{{ w.on_hand }}</td><td class="n">{{ w.reserved }}</td><td class="n">{{ w.incoming }}</td>
-    <td>{{ w.items or "—" }}</td>
+    <td>{{ w["items"] or "—" }}</td>
     <td>{% if not w.deleted_at %}
       {% set q = "Удалить ФФ «%s»?" % w.name %}
       {% if w.on_hand or w.incoming %}{% set q = q ~ " На нём числится %s шт. (резерв %s), едет ещё %s. Остатки сохранятся на удалённом ФФ, их можно будет переместить." % (w.on_hand, w.reserved, w.incoming) %}{% endif %}
